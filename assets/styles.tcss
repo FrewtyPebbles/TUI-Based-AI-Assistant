@@ -1,0 +1,58 @@
+ModelDisplay {
+    dock: bottom;
+    background: $accent;
+    color: $text;
+    height: 1;
+    background: rgb(75, 20, 20);
+}
+#page-switcher {
+    width: 100%;
+    height: 100%;
+    background: rgb(15, 0, 0);
+}
+
+ModelSelectionPrompt {
+    width: 100%;
+    height: 100%;
+    border: solid $primary;
+    background: rgb(25,0,0);
+    content-align: center middle;
+    color: red;
+}
+
+Header {
+    color: red;
+    background: rgb(30, 20, 20);
+}
+
+ModelSelectionPrompt #option-list-container {
+    margin: 0 10 0 10;
+    content-align: center middle;
+    color:red;
+}
+
+ModelSelectionPrompt #option-list-container {
+    margin: 0 10 0 10;
+    content-align: center middle;
+}
+
+ModelSelectionPrompt #select-button {
+    dock: bottom;
+    width: 15;
+    height: 3;
+}
+
+UserMessage {
+    background: rgb(50, 30, 30);
+    border: round white;
+    border-left: none;
+    margin: 1 1 1 0;
+    align: right middle;
+}
+
+ModelMessage {
+    background: rgb(30, 10, 10);
+    border: round white;
+    border-right: none;
+    margin: 1 0 1 1;
+}
