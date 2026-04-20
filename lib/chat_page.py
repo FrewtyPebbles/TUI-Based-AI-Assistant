@@ -17,15 +17,17 @@ if TYPE_CHECKING:
 
 class ChatInput(TextArea):
     """A TextArea that submits on Enter instead of adding a newline."""
+    app:"AppGUI"
     async def _on_key(self, event: events.Key) -> None:
         if event.key == "enter" and not event.key == "shift+enter":
             event.prevent_default()
             event.stop()
-            
-            prompt = self.text.strip()
-            if prompt:
-                self.text = ""
-                self.screen.query_one(ChatPage).send_prompt(prompt)
+            if not self.app.agent.currently_responding:
+                self.app.agent.currently_responding = True
+                prompt = self.text.strip()
+                if prompt:
+                    self.text = ""
+                    self.screen.query_one(ChatPage).send_prompt(prompt)
         if event.key == "shift+enter":
             event.prevent_default()
             event.stop()

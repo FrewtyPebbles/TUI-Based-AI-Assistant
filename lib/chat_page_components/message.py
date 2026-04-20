@@ -1,3 +1,6 @@
+import logging
+
+from plyer import notification
 from textual import work
 from textual.widgets import Static, Markdown, Label
 from textual.reactive import reactive
@@ -34,11 +37,14 @@ class ModelMessage(Static):
             raise RuntimeError("Attempt to stream message without a streaming_response set.")
         full_content = ""
         thinking = False
-        tool_calls_dict:dict[str, oll.Message.ToolCall] = {} 
+        tool_calls_dict:dict[str, oll.Message.ToolCall] = {}
+        thinking_text = ""
         async for chunk in self.streaming_response:
             message = chunk.message
             content = message.content
-            if content:
+            if message.thinking:
+                thinking_text += message.thinking
+            elif content:
                 full_content += content
                 if "<think>" in full_content and "</think>" not in full_content:
                     thinking = True
@@ -90,6 +96,7 @@ class ModelMessage(Static):
             if function_name == "finish_response_tool":
                 self.time = datetime.datetime.now()
                 break
+        logging.info(f"MODEL THINKING:\n{thinking_text}")
 
     def watch_time(self, old_value: datetime.datetime | None, new_value: datetime.datetime | None):
         model_message_time = self.query_one("#model-message-time", Label)

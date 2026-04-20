@@ -11,13 +11,24 @@ from pathlib import Path
 import os
 import platform
 
+from sqlalchemy import Row, func, select
+from sqlalchemy.orm import Session
+import sqlite_vec
 from textual.containers import VerticalScroll
 from lib.agent.command import Shell
+from lib.agent.tools.contact import Contact
 from lib.chat_page import ChatPage
 from lib.chat_page_components.message import ModelMessage
+from lib.database.engine import SQL_ENGINE
 from lib.session_manager import SessionData
 from dataclasses import dataclass
 from itertools import islice
+import webbrowser
+from sentence_transformers import SentenceTransformer
+from urllib.parse import urlencode, quote
+from rapidfuzz.distance import Levenshtein
+
+from lib.utility import format_contact_embedding_string
 if TYPE_CHECKING:
     from main import AppGUI
 
@@ -58,7 +69,12 @@ class Agent:
     def __init__(self):
         self.oll_client = oll.AsyncClient()
         self.shell = Shell()
+        self.embeddings_model = SentenceTransformer('all-MiniLM-L6-v2')
         self.finished_response = False
+        self.currently_responding = False
+        contacts = []
+        with Session(bind=SQL_ENGINE) as session:
+            contacts = session.scalars(select(Contact)).all()
         self.agents = {
             "Assistant":AgentType(
                 "Assistant",
@@ -71,8 +87,13 @@ class Agent:
                     self.get_current_working_directory_path,
                     self.read_file,
                     self.finish_response_tool,
+                    self.add_contact,
+                    self.delete_contact,
+                    self.search_contacts,
+                    self.edit_contact,
+                    self.send_email,
                 ],
-                Path(r"agent_system_prompts\Assistant.md").read_text()
+                Path(r"agent_system_prompts\Assistant.md").read_text() + "\n# Additional Information\n\n## Contacts\n - " + "\n - ".join([con.name for con in contacts])
             ),
             "SWE Assistant":AgentType(
                 "SWE Assistant",
@@ -85,8 +106,13 @@ class Agent:
                     self.get_current_working_directory_path,
                     self.read_file,
                     self.finish_response_tool,
+                    self.add_contact,
+                    self.delete_contact,
+                    self.search_contacts,
+                    self.edit_contact,
+                    self.send_email,
                 ],
-                Path(r"agent_system_prompts\SWE Assistant.md").read_text()
+                Path(r"agent_system_prompts\SWE Assistant.md").read_text() + "\n# Additional Information\n\n## Contacts\n - " + "\n - ".join([con.name for con in contacts])
             )
         }
         self.current_agent = self.agents["Assistant"]
@@ -114,6 +140,17 @@ class Agent:
                 return self.read_file(**arguments)
             case "finish_response_tool":
                 return self.finish_response_tool()
+            case "add_contact":
+                return self.add_contact(**arguments)
+            case "delete_contact":
+                return self.delete_contact(**arguments)
+            case "edit_contact":
+                return self.edit_contact(**arguments)
+            case "search_contacts":
+                return self.search_contacts(**arguments)
+            case "send_email":
+                return self.send_email(**arguments)
+            
 
     async def prompt(self):
         chat_page = self.app.screen.query_one(ChatPage)
@@ -128,12 +165,9 @@ class Agent:
             ])
             logging.info(f"""Current message history ({datetime.datetime.now().strftime("%d/%m/%Y, %H:%M:%S")}):\n{history_str}""")
             streaming_response:AsyncIterator[oll.ChatResponse] =  await self.oll_client.chat(model=self.app.current_model.model, messages=self.app.session_data.get_history(),
-                think=False,
+                think=True,
                 stream=True,
                 tools=self.current_agent.tools,
-                options={
-                    'think': False
-                }
             )
 
 
@@ -147,10 +181,125 @@ class Agent:
 
         # Reset boolean
         self.finished_response = False
+        self.currently_responding = False
         logging.info("Finished message generation.")
 
     
     # TOOLS
+    
+    def add_contact(self, name:str, email:str | None = None, phone_number:str | None = None, notes:str | None = None):
+        """
+        Adds a contact to the user's contact book.
+        Args:
+            name(Required, type:str): The name of the contact.
+            email(Optional, type:str): The email of the contact.
+            phone_number(Optional, type:str): The phone number of the contact, must follow the regex format "^\+[1-9]\d{1,14}$".
+            notes(Optional, type:str): Notes about the contact.
+        """
+        with Session(bind=SQL_ENGINE) as session:
+            embedding_string = format_contact_embedding_string(name, email, phone_number, notes)
+            embedding = self.embeddings_model.encode(embedding_string).tolist()
+            contact = Contact(
+                name=name,
+                email=email,
+                phone_number=phone_number,
+                notes=notes,
+                embedding=embedding
+            )
+            try:
+                session.add(contact)
+                session.commit()
+                return f"Successfully added contact: \"{name}\""
+            except Exception as e:
+                session.rollback()
+                error_message = str(e)
+                return f"Failed to add contact: {error_message}"
+        
+    def delete_contact(self, name:str):
+        """
+        Deletes a contact from the user's contact book.
+        Args:
+            name(Required, type:str): The name of the contact. This must be exact.
+        """
+        with Session(bind=SQL_ENGINE) as session:
+            contact = session.query(Contact).filter(Contact.name == name).first()
+
+            if contact:
+                session.delete(contact)
+        
+                # 3. Commit the change to the file
+                try:
+                    session.commit()
+                    return f"Successfully deleted contact: \"{name}\""
+                except Exception as e:
+                    session.rollback()
+                    return f"Error deleting contact: {str(e)}"
+            else:
+                return f"Failed to find contact with name: \"{name}\"\nTry searching for the contact first."
+
+    def search_contacts(self, query_text: str, limit: int = 5):
+        """
+        Searches the user's contact book for contacts based on a search prompt and returns a specified amount of results in order from most to least similar.
+        Contacts always include a name and usually include an email, phone number, and notes about the person.
+        This tool encodes the query_text into an embedding and compares it with existing contacts using cosine similarity.
+        Args:
+            query_text(Required, type:str): A search prompt to find contacts with.
+            limit(Optional, type:int): The amount of contacts to return. The default value for this is 5.
+        """
+        query_vector = self.embeddings_model.encode(query_text).tolist()
+        query_vector_bytes = sqlite_vec.serialize_float32(query_vector)
+
+        with Session(bind=SQL_ENGINE) as session:
+            # use cosine similarity to look up contact
+            contacts:list[tuple[Contact, float]] = session.query(
+                Contact, 
+                func.vec_distance_cosine(Contact.embedding, query_vector_bytes).label("distance")
+            ).order_by(
+                "distance"
+            ).limit(limit).all()
+
+            return_value = f"Found {len(contacts)} Contacts" + (":" if len(contacts) > 0 else ".")
+            for i, (contact, similarity_score) in enumerate(contacts, 1):
+                return_value += f"\n --- Result {i} --- \nName: {contact.name}\nEmail: {contact.email}\nPhone Number: {contact.phone_number}\nNotes:\n{contact.notes}\n"
+
+            return return_value
+
+    def edit_contact(self, name:str, email:str | None = None, phone_number:str | None = None, notes:str | None = None):
+        """
+        Edits a contact in the user's contact book. If one of the optional arguments is not included, it will not be changed in the contact.
+        Whenever you learn something new about an existing contact, you should add it to that contact's notes.
+        Args:
+            name(Required, type:str): The name of the contact. This tool will do an edit-distance fuzzy lookup of the name when searching for the contact to edit.
+            email(Optional, type:str): The email of the contact.
+            phone_number(Optional, type:str): The phone number of the contact, must follow the regex format "^\+[1-9]\d{1,14}$".
+            notes(Optional, type:str): Notes about the contact.
+        """
+        with Session(bind=SQL_ENGINE) as session:
+            contact = session.query(Contact).filter(
+                func.levenshtein(Contact.name, name) <= 3
+            ).order_by(
+                func.levenshtein(Contact.name, name).asc()
+            ).first()
+            # Edit the contact
+            if email is not None:
+                contact.email = email
+            if phone_number is not None:
+                contact.phone_number = phone_number
+            if notes is not None:
+                contact.notes = notes
+
+            # Regenerate the vector embedding since the data changed
+            embedding_string = format_contact_embedding_string(contact.name, contact.email, contact.phone_number, contact.notes)
+            contact.embedding = self.embeddings_model.encode(embedding_string).tolist()
+            try:
+                session.commit()
+                return f"Successfully edited contact: \"{contact.name}\""
+            except Exception as e:
+                # Extract the message
+                session.rollback()
+                error_message = str(e)
+                return f"Failed to edit contact: {error_message}"
+
     async def request_command(self, command:str, command_arguments:list[str|Path]) -> None:
         """
         Request to run a shell command on the user's pc. The command is executed in the format:
@@ -299,6 +448,27 @@ class Agent:
         You MUST call this tool when you believe that you have finished fulfilling/answering the user's prompt/request.
         """
         self.finished_response = True
+
+    def send_email(self, recipient:str, subject:str, body:str, cc:list[str] | None = None):
+        """
+        Sends an email to the specified recipient and list of cc emails with the specified subject and body.
+        If you are unsure what the recipient or cc's email addresses are check the contact book with the search_contacts tool.
+        IMPORTANT: Do not try to send an email if you dont know the recipient's email!
+
+        Args:
+            recipient(Required, type:str): The recipient email of the email.
+            subject(Required, type:str): The subject of the email.
+            body(Required, type:str): The body of the email.
+            cc(Optional, type:list[str]): A list of emails to cc the email to. The default value is None.
+        """
+        cc_enc = f"cc={quote(','.join(cc))}&" if cc is not None else ""
+        subject_enc = quote(subject)
+        body_enc = quote(body)
+        
+        url = f"mailto:{recipient}?{cc_enc}subject={subject_enc}&body={body_enc}"
+        webbrowser.open(url)
+        return f"Email:\nRecipient: {recipient}\nCC: {', '.join(cc) if cc is not None else 'None'}\nSubject: {subject}\nBody:\n{body}"
+
 
 if platform.system().lower() == "windows":
     Agent.list_items_in_directory.__doc__ = """

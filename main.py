@@ -1,6 +1,7 @@
 from textual.app import App, ComposeResult
 from textual.widgets import Header, Footer, Label, Static, ContentSwitcher
 from lib.chat_page import ChatPage
+from lib.database.engine import SQL_ENGINE, SQLBase
 from lib.model_selection import ModelDisplay, ModelSelectionPrompt
 from textual.reactive import reactive
 import ollama as oll
@@ -25,6 +26,7 @@ class AppGUI(App):
         self.current_model = model
 
     def __init__(self, driver_class = None, css_path = None, watch_css = False, ansi_color = False):
+        SQLBase.metadata.create_all(SQL_ENGINE)
         super().__init__(driver_class, css_path, watch_css, ansi_color)
         self.model_display = ModelDisplay()
         self.agent.app = self
