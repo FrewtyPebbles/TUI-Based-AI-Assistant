@@ -1,4 +1,6 @@
 from dotenv import load_dotenv
+
+from lib.ollama_url_page import OllamaUrlPage
 load_dotenv()
 from textual.app import App, ComposeResult
 from textual.widgets import Header, Footer, Label, Static, ContentSwitcher
@@ -13,14 +15,14 @@ import logging
 from lib.session_manager import SessionData
 
 class AppGUI(App):
-    TITLE = "Tensor Chat"
+    TITLE = "Little Bug"
     CSS_PATH = "assets/styles.tcss"
 
     agent:Agent = Agent()
 
     current_model:reactive[oll.ListResponse.Model | None] = reactive(None)
     
-    current_page_stack:reactive[list[str]] = reactive(["model-selector-page"])
+    current_page_stack:reactive[list[str]] = reactive(["ollama-url-page"])
 
     session_data:SessionData | None = None
 
@@ -64,11 +66,15 @@ class AppGUI(App):
 
     def compose(self) -> ComposeResult:
         yield Header(True)
-        with ContentSwitcher(initial="model-selector-page", id="page-switcher"):
+        with ContentSwitcher(initial="ollama-url-page", id="page-switcher"):
+            yield OllamaUrlPage(id="ollama-url-page")
             yield ModelSelectionPrompt(self.set_model, id="model-selector-page")
             yield ChatPage(id="chat-page")
         yield self.model_display
 
-if __name__ == "__main__":
+def main():
     app = AppGUI()
     app.run()
+
+if __name__ == "__main__":
+    main()

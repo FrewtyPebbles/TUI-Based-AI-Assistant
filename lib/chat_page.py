@@ -5,11 +5,12 @@ from textual.app import ComposeResult
 from textual.reactive import reactive
 from textual.widgets import Header, Footer, Label, OptionList, Static, Button, TextArea, Markdown
 from textual.widgets.option_list import Option
-from textual.containers import VerticalScroll
+from textual.containers import VerticalScroll, Horizontal
 from textual.worker import Worker
 from lib.chat_page_components.message import UserMessage, ModelMessage
 import ollama as oll
 from typing import Any, Callable, TYPE_CHECKING
+from lib.custom_widgets.toggle_box import ToggleBox
 from lib.session_manager import SessionData
 import datetime
 if TYPE_CHECKING:
@@ -39,10 +40,15 @@ class ChatPage(Static):
     def compose(self) -> ComposeResult:
         yield VerticalScroll(id="chat-history")
         yield ChatInput(placeholder="Type your prompt here.", id="prompt-box")
-        yield Label("?", id="chat-topic")
+        with Horizontal():
+            yield ToggleBox("Assistant", "SWE Assistant", option_colors=["blue", "green"])
+            yield Label("█▓▒░ ? ░▒▓█", id="chat-topic")
+
 
     def on_show(self) -> None:
         self.query_one("#prompt-box").focus()
+        c_t = self.query_one("#chat-topic", Label)
+        c_t.styles.width = len(c_t.content)
 
     async def append_user_message(self, message: dict):
         # Use .update() to refresh the visual label
@@ -71,7 +77,9 @@ class ChatPage(Static):
         if topic_response_cort != None:
             topic_response = await topic_response_cort
             self.app.session_data.name = topic_response.response
-            self.query_one("#chat-topic", Label).update(topic_response.response)
+            c_t = self.query_one("#chat-topic", Label)
+            c_t.update(f"█▓▒░ {topic_response.response} ░▒▓█")
+            c_t.styles.width = len(c_t.content)
 
         await self.app.agent.prompt()
 

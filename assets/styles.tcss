@@ -31,11 +31,6 @@ ModelSelectionPrompt #option-list-container {
     color:red;
 }
 
-ModelSelectionPrompt #option-list-container {
-    margin: 0 10 0 10;
-    content-align: center middle;
-}
-
 ModelSelectionPrompt #select-button {
     dock: bottom;
     width: 15;
@@ -61,4 +56,15 @@ ChatInput {
     background: rgb(30,10,10);
     height:20%;
     min-height:5;
+}
+
+ChatPage > Horizontal {
+    height: 1;
+    width: 100%;
+    background: white;
+}
+
+Horizontal #chat-topic {
+    text-style:underline;
+    background:black;
 }

@@ -314,7 +314,9 @@ class Agent:
             command: The command/program name.
             command_arguments: The command line interface arguments for the command.
         """
-        self.shell.push_command(command, command_arguments)
+        cmd = await self.shell.push_command(command, command_arguments)
+        
+        return f"Requested command \"{cmd.get_command_string()}\""
 
     async def run_command(self, command:str, command_arguments:list[str|Path]) -> str:
         """
@@ -326,8 +328,12 @@ class Agent:
             command: The command/program name.
             command_arguments: The command line interface arguments for the command.
         """
-        self.shell.push_command(command, command_arguments)
-        return self.shell.command_queue.get().approve()
+        logging.info(f"Executing: {command} {' '.join(command_arguments)}")
+        await self.shell.push_command(command, command_arguments)
+        command_obj = await self.shell.command_queue.get()
+        executed_command = await command_obj.approve()
+        logging.info("Command finished.")
+        return "\n".join(executed_command)
 
     async def get_datetime(self,
     timezone_name: Literal[
@@ -379,11 +385,14 @@ class Agent:
             if file.is_file():
                 line_count = 0
                 char_count = 0
-                with open('large_file.txt', 'r', encoding='utf-8') as f:
-                    for line in f:
-                        line_count += 1
-                        char_count += len(line)
-                ret += f"\tline count: {line_count}\n\tcharacter count: {char_count}\n"
+                try:
+                    with open(file, 'r', encoding='utf-8') as f:
+                        for line in f:
+                            line_count += 1
+                            char_count += len(line)
+                    ret += f"\tline count: {line_count}\n\tcharacter count: {char_count}\n"
+                except UnicodeDecodeError:
+                    pass
         ret += f"Listed {len([*directory.iterdir()])} file system items in directory."
         return ret
     

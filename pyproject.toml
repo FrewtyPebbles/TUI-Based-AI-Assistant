@@ -17,3 +17,5 @@ dependencies = [
     "textual>=8.2.3",
     "textual-dev>=1.8.0",
 ]
+[project.scripts]
+littlebug = "main:main"
