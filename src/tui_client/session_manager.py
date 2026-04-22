@@ -3,7 +3,7 @@ from typing import AsyncIterator, Awaitable, Callable
 import ollama as oll
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
-    from main import AppGUI
+    from tui_client.main import AppGUI
 
 class SessionData:
     def __init__(self, app:"AppGUI"):

@@ -3,11 +3,11 @@ from textual.app import ComposeResult
 from textual.reactive import reactive
 from textual.widgets import Header, Footer, Label, OptionList, Static, Button
 from textual.widgets.option_list import Option
-from lib.chat_page import ChatPage
+from tui_client.chat_page import ChatPage
 import ollama as oll
 from typing import Callable, TYPE_CHECKING
 if TYPE_CHECKING:
-    from main import AppGUI
+    from tui_client.main import AppGUI
 
 class ModelDisplay(Static):
     model_name = reactive("?")
@@ -19,7 +19,7 @@ class ModelSelectionPrompt(Static):
     app:AppGUI
     def __init__(self, model_selected_callback:Callable[[oll.ListResponse.Model],None], **kwargs):
         super().__init__(**kwargs)
-        self.ollama_models = oll.list().models
+        self.ollama_models = []
         self.model_selected_callback = model_selected_callback
 
     def compose(self) -> ComposeResult:

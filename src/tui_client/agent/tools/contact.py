@@ -3,7 +3,7 @@ import re
 
 from sqlalchemy import Column, Integer, String
 
-from lib.database.engine import SQLBase, SQLiteVector
+from tui_client.database.engine import SQLBase, SQLiteVector
 from sqlalchemy.orm import validates
 
 EMAIL_REGEX = r"\A[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*@(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\Z"

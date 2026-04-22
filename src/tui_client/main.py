@@ -1,24 +1,26 @@
 from dotenv import load_dotenv
 
-from lib.ollama_url_page import OllamaUrlPage
+from tui_client.ollama_url_page import OllamaUrlPage
+from tui_client.utility import SRC_FOLDER
 load_dotenv()
 from textual.app import App, ComposeResult
 from textual.widgets import Header, Footer, Label, Static, ContentSwitcher
-from lib.chat_page import ChatPage
-from lib.database.engine import SQL_ENGINE, SQLBase
-from lib.model_selection import ModelDisplay, ModelSelectionPrompt
+from tui_client.chat_page import ChatPage
+from tui_client.database.engine import SQL_ENGINE, SQLBase
+from tui_client.model_selection import ModelDisplay, ModelSelectionPrompt
 from textual.reactive import reactive
 import ollama as oll
-from lib.agent import Agent
+from tui_client.agent import Agent
 import logging
 
-from lib.session_manager import SessionData
+from tui_client.session_manager import SessionData
+
 
 class AppGUI(App):
     TITLE = "Little Bug"
-    CSS_PATH = "assets/styles.tcss"
+    CSS_PATH = SRC_FOLDER / "tui_client/assets/styles.tcss"
 
-    agent:Agent = Agent()
+    agent:Agent | None = None
 
     current_model:reactive[oll.ListResponse.Model | None] = reactive(None)
     
@@ -30,10 +32,8 @@ class AppGUI(App):
         self.current_model = model
 
     def __init__(self, driver_class = None, css_path = None, watch_css = False, ansi_color = False):
-        SQLBase.metadata.create_all(SQL_ENGINE)
         super().__init__(driver_class, css_path, watch_css, ansi_color)
         self.model_display = ModelDisplay()
-        self.agent.app = self
 
 
     def watch_current_model(self, model: oll.ListResponse.Model) -> None:
@@ -73,6 +73,7 @@ class AppGUI(App):
         yield self.model_display
 
 def main():
+    SQLBase.metadata.create_all(SQL_ENGINE)
     app = AppGUI()
     app.run()
 

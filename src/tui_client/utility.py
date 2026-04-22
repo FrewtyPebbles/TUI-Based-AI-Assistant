@@ -1,7 +1,10 @@
+from pathlib import Path
 from typing import Any
 import subprocess
 import os
 import re
+
+SRC_FOLDER = Path(__file__).resolve().parent.parent
 
 def repr_tool_args(args:dict[str, Any]) -> str:
     return ", ".join([f"{arg}={val}" for arg, val in args.items()])
@@ -12,6 +15,7 @@ def format_contact_embedding_string(name:str, email:str | None = None, phone_num
 
 def set_permanent_env_var(key:str, value:str):
     system = os.name
+    os.environ[key] = value
     
     if system == 'nt':
         # Windows handles overwriting automatically

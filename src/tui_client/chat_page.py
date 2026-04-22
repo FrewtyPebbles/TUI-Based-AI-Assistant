@@ -7,14 +7,14 @@ from textual.widgets import Header, Footer, Label, OptionList, Static, Button, T
 from textual.widgets.option_list import Option
 from textual.containers import VerticalScroll, Horizontal
 from textual.worker import Worker
-from lib.chat_page_components.message import UserMessage, ModelMessage
+from tui_client.chat_page_components.message import UserMessage, ModelMessage
 import ollama as oll
 from typing import Any, Callable, TYPE_CHECKING
-from lib.custom_widgets.toggle_box import ToggleBox
-from lib.session_manager import SessionData
+from tui_client.custom_widgets.toggle_box import ToggleBox
+from tui_client.session_manager import SessionData
 import datetime
 if TYPE_CHECKING:
-    from main import AppGUI
+    from tui_client.main import AppGUI
 
 class ChatInput(TextArea):
     """A TextArea that submits on Enter instead of adding a newline."""

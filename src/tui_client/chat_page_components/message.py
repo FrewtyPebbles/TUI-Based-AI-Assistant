@@ -8,9 +8,9 @@ import datetime
 import ollama as oll
 from typing import TYPE_CHECKING, Any, AsyncIterator
 
-from lib.utility import repr_tool_args
+from tui_client.utility import repr_tool_args
 if TYPE_CHECKING:
-    from main import AppGUI
+    from tui_client.main import AppGUI
 
 class UserMessage(Static):
     app: "AppGUI"

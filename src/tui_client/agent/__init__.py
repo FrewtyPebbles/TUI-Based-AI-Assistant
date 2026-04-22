@@ -15,12 +15,12 @@ from sqlalchemy import Row, func, select
 from sqlalchemy.orm import Session
 import sqlite_vec
 from textual.containers import VerticalScroll
-from lib.agent.command import Shell
-from lib.agent.tools.contact import Contact
-from lib.chat_page import ChatPage
-from lib.chat_page_components.message import ModelMessage
-from lib.database.engine import SQL_ENGINE
-from lib.session_manager import SessionData
+from tui_client.agent.command import Shell
+from tui_client.agent.tools.contact import Contact
+from tui_client.chat_page import ChatPage
+from tui_client.chat_page_components.message import ModelMessage
+from tui_client.database.engine import SQL_ENGINE
+from tui_client.session_manager import SessionData
 from dataclasses import dataclass
 from itertools import islice
 import webbrowser
@@ -28,13 +28,18 @@ from sentence_transformers import SentenceTransformer
 from urllib.parse import urlencode, quote
 from rapidfuzz.distance import Levenshtein
 
-from lib.utility import format_contact_embedding_string
+from tui_client.utility import format_contact_embedding_string, SRC_FOLDER
 import os
 if TYPE_CHECKING:
-    from main import AppGUI
+    from tui_client.main import AppGUI
+
+LOGS_FILE = Path('.logs/agent.info.log')
+
+if not LOGS_FILE.parent.exists():
+    LOGS_FILE.parent.mkdir()
 
 logging.basicConfig(
-    filename='.logs/agent.log', 
+    filename=LOGS_FILE, 
     filemode='w', 
     level=logging.INFO,
     format='AGENT[%(asctime)s | %(name)s | %(levelname)s] - %(message)s'
@@ -80,8 +85,8 @@ class Agent:
             "Assistant":AgentType(
                 "Assistant",
                 [
-                    self.request_command,
-                    self.run_command,
+                    # self.request_command,
+                    # self.run_command,
                     self.get_datetime,
                     self.get_operating_system,
                     self.list_items_in_directory,
@@ -94,13 +99,13 @@ class Agent:
                     self.edit_contact,
                     self.send_email,
                 ],
-                Path(r"agent_system_prompts\Assistant.md").read_text() + "\n# Additional Information\n\n## Contacts\n - " + "\n - ".join([con.name for con in contacts])
+                (SRC_FOLDER / r"agent_system_prompts\Assistant.md").read_text() + "\n# Additional Information\n\n## Contacts\n - " + "\n - ".join([con.name for con in contacts])
             ),
             "SWE Assistant":AgentType(
                 "SWE Assistant",
                 [
-                    self.request_command,
-                    self.run_command,
+                    # self.request_command,
+                    # self.run_command,
                     self.get_datetime,
                     self.get_operating_system,
                     self.list_items_in_directory,
@@ -113,7 +118,7 @@ class Agent:
                     self.edit_contact,
                     self.send_email,
                 ],
-                Path(r"agent_system_prompts\SWE Assistant.md").read_text() + "\n# Additional Information\n\n## Contacts\n - " + "\n - ".join([con.name for con in contacts])
+                (SRC_FOLDER / r"agent_system_prompts\SWE Assistant.md").read_text() + "\n# Additional Information\n\n## Contacts\n - " + "\n - ".join([con.name for con in contacts])
             )
         }
         self.current_agent = self.agents["Assistant"]
